@@ -58,24 +58,27 @@ export function isSlotAvailable(slot: TimeSlot, bookings: Booking[]): boolean {
 export async function getAvailableSlots(
   technicianId: string,
   date: Date,
-  requiredDuration: number
+  requiredDuration: number,
+  excludeBookingId?: string
 ): Promise<TimeSlot[]> {
   const { start: businessStart, end: businessEnd } = await getBusinessHours();
   const allSlots = generateTimeSlots(businessStart, businessEnd, 30);
 
   const dateStr = date.toISOString().split('T')[0];
-  const bookings = await prisma.booking.findMany({
-    where: {
-      technician_id: technicianId,
-      booking_date: {
-        gte: new Date(dateStr + 'T00:00:00.000Z'),
-        lt: new Date(dateStr + 'T23:59:59.999Z'),
-      },
-      status: {
-        in: ['pending', 'confirmed'],
-      },
+  const where: any = {
+    technician_id: technicianId,
+    booking_date: {
+      gte: new Date(dateStr + 'T00:00:00.000Z'),
+      lt: new Date(dateStr + 'T23:59:59.999Z'),
     },
-  });
+    status: {
+      in: ['pending', 'confirmed'],
+    },
+  };
+  if (excludeBookingId) {
+    where.id = { not: excludeBookingId };
+  }
+  const bookings = await prisma.booking.findMany({ where });
 
   const typedBookings = bookings as unknown as Booking[];
   const availableSlots: TimeSlot[] = [];

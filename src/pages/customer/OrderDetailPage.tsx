@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Button, Steps, message } from 'antd';
+import { Button, Steps, message, Modal } from 'antd';
 import {
   ArrowLeft,
   Calendar,
@@ -14,9 +14,11 @@ import {
   CheckCircle,
   XCircle,
   Clock3,
+  XOctagon,
+  RefreshCw,
 } from 'lucide-react';
 import type { Booking, Order } from '@/types';
-import { getBooking, getOrders } from '@/services/api';
+import { getBooking, getOrders, cancelBooking } from '@/services/api';
 import {
   formatCurrency,
   formatDate,
@@ -24,6 +26,7 @@ import {
   getStatusLabel,
 } from '@/utils/format';
 import Layout from '@/components/Layout';
+import RescheduleModal from '@/components/RescheduleModal';
 import { cn } from '@/lib/utils';
 
 export default function OrderDetailPage() {
@@ -32,6 +35,8 @@ export default function OrderDetailPage() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showReschedule, setShowReschedule] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -57,6 +62,36 @@ export default function OrderDetailPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const canModify = booking && (booking.status === 'pending' || booking.status === 'confirmed');
+
+  const handleCancel = () => {
+    if (!booking) return;
+    Modal.confirm({
+      title: '确认取消预约',
+      content: '取消后该时段将被释放，您确定要取消预约吗？',
+      okText: '确认取消',
+      cancelText: '再想想',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setCancelling(true);
+        try {
+          await cancelBooking(booking.id);
+          message.success('预约已取消，工时已回滚');
+          loadData();
+        } catch (error: any) {
+          const errMsg = error?.response?.data?.message || '取消失败，请重试';
+          message.error(errMsg);
+        } finally {
+          setCancelling(false);
+        }
+      },
+    });
+  };
+
+  const handleRescheduleSuccess = () => {
+    loadData();
   };
 
   const getStepStatus = () => {
@@ -161,6 +196,30 @@ export default function OrderDetailPage() {
                 </p>
               </div>
             </div>
+            {canModify && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowReschedule(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  改约
+                </button>
+                <button
+                  onClick={handleCancel}
+                  disabled={cancelling}
+                  className={cn(
+                    'flex items-center gap-1.5 px-4 py-2 text-sm rounded-lg transition-colors',
+                    cancelling
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-red-50 text-red-700 hover:bg-red-100'
+                  )}
+                >
+                  <XOctagon className="w-4 h-4" />
+                  {cancelling ? '取消中...' : '取消预约'}
+                </button>
+              </div>
+            )}
           </div>
 
           {booking.status !== 'cancelled' && (
@@ -308,6 +367,15 @@ export default function OrderDetailPage() {
           </div>
         </motion.div>
       </div>
+
+      {booking && (
+        <RescheduleModal
+          open={showReschedule}
+          onClose={() => setShowReschedule(false)}
+          booking={booking}
+          onSuccess={handleRescheduleSuccess}
+        />
+      )}
     </Layout>
   );
 }

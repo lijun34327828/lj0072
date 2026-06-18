@@ -11,6 +11,8 @@ import {
   User,
   Phone,
   Scissors,
+  XOctagon,
+  RefreshCw,
 } from 'lucide-react';
 import { Tabs, Input, Modal, Form, InputNumber, message, Empty } from 'antd';
 import dayjs from 'dayjs';
@@ -20,6 +22,7 @@ import {
   getOrder,
   applyDiscount,
   completeOrder,
+  cancelBooking,
 } from '@/services/api';
 import {
   formatCurrency,
@@ -28,6 +31,7 @@ import {
   getStatusLabel,
 } from '@/utils/format';
 import Layout from '@/components/Layout';
+import RescheduleModal from '@/components/RescheduleModal';
 import { cn } from '@/lib/utils';
 
 export default function AdminOrdersPage() {
@@ -40,6 +44,10 @@ export default function AdminOrdersPage() {
     open: boolean;
     order: Order | null;
   }>({ open: false, order: null });
+  const [rescheduleModal, setRescheduleModal] = useState<{
+    open: boolean;
+    booking: Booking | null;
+  }>({ open: false, booking: null });
   const [form] = Form.useForm();
   const navigate = useNavigate();
 
@@ -111,6 +119,52 @@ export default function AdminOrdersPage() {
         }
       },
     });
+  };
+
+  const canModifyBooking = (order: Order) => {
+    if (!order.booking) return false;
+    return order.booking.status === 'pending' || order.booking.status === 'confirmed';
+  };
+
+  const handleCancelBooking = (order: Order) => {
+    if (!order.booking) return;
+    Modal.confirm({
+      title: '确认取消预约',
+      content: (
+        <div>
+          <p>取消后该时段将被释放，工时实时回滚。</p>
+          <p className="text-sm text-gray-500 mt-2">
+            顾客：{order.customer?.name} | 技师：{order.booking.technician?.name}
+          </p>
+        </div>
+      ),
+      okText: '确认取消',
+      cancelText: '再想想',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        try {
+          await cancelBooking(order.booking!.id);
+          message.success('预约已取消，工时已回滚');
+          loadOrders();
+        } catch (error: any) {
+          const errMsg = error?.response?.data?.message || '取消失败，请重试';
+          message.error(errMsg);
+        }
+      },
+    });
+  };
+
+  const handleReschedule = (order: Order) => {
+    if (!order.booking) return;
+    setRescheduleModal({
+      open: true,
+      booking: order.booking,
+    });
+  };
+
+  const handleRescheduleSuccess = () => {
+    setRescheduleModal({ open: false, booking: null });
+    loadOrders();
   };
 
   const getStatusColor = (status: string) => {
@@ -215,7 +269,7 @@ export default function AdminOrdersPage() {
                       创建于 {formatDate(order.created_at)}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {order.status === 'pending' && (
                       <button
                         onClick={() =>
@@ -235,6 +289,24 @@ export default function AdminOrdersPage() {
                         <CheckCircle className="w-4 h-4" />
                         完成订单
                       </button>
+                    )}
+                    {canModifyBooking(order) && (
+                      <>
+                        <button
+                          onClick={() => handleReschedule(order)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                          改约
+                        </button>
+                        <button
+                          onClick={() => handleCancelBooking(order)}
+                          className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
+                        >
+                          <XOctagon className="w-4 h-4" />
+                          取消预约
+                        </button>
+                      </>
                     )}
                     <button
                       onClick={() => navigate(`/orders/${order.booking_id}`)}
@@ -336,6 +408,17 @@ export default function AdminOrdersPage() {
           </div>
         </Form>
       </Modal>
+
+      {rescheduleModal.booking && (
+        <RescheduleModal
+          open={rescheduleModal.open}
+          onClose={() =>
+            setRescheduleModal({ open: false, booking: null })
+          }
+          booking={rescheduleModal.booking}
+          onSuccess={handleRescheduleSuccess}
+        />
+      )}
     </Layout>
   );
 }

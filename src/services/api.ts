@@ -84,6 +84,20 @@ export const updateBookingStatus = async (id: string, status: BookingStatus): Pr
   return api.patch(`/bookings/${id}/status`, { status });
 };
 
+export const cancelBooking = async (id: string): Promise<Booking> => {
+  return api.post(`/bookings/${id}/cancel`);
+};
+
+export interface RescheduleData {
+  technician_id: string;
+  booking_date: string;
+  start_time: string;
+}
+
+export const rescheduleBooking = async (id: string, data: RescheduleData): Promise<Booking> => {
+  return api.post(`/bookings/${id}/reschedule`, data);
+};
+
 export const getOrders = async (params?: {
   customerId?: string;
   status?: OrderStatus;
