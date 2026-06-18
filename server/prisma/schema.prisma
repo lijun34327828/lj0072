@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Service {
+  id                String          @id @default(uuid())
+  name              String
+  category          String
+  standard_duration Float
+  hourly_rate       Float
+  description       String?
+  image_url         String?
+  is_active         Boolean         @default(true)
+  bookingServices   BookingService[]
+
+  @@map("services")
+}
+
+model Technician {
+  id         String    @id @default(uuid())
+  name       String
+  employee_no String   @unique
+  phone      String?
+  avatar_url String?
+  rating     Float     @default(0)
+  skills     String
+  is_active  Boolean   @default(true)
+  bookings   Booking[]
+
+  @@map("technicians")
+}
+
+model Customer {
+  id         String    @id @default(uuid())
+  name       String
+  phone      String    @unique
+  avatar_url String?
+  points     Int       @default(0)
+  bookings   Booking[]
+
+  @@map("customers")
+}
+
+model Booking {
+  id             String           @id @default(uuid())
+  customer_id    String
+  technician_id  String
+  booking_date   DateTime
+  start_time     String
+  end_time       String
+  total_duration Float
+  status         String           @default("pending")
+  created_at     DateTime         @default(now())
+  customer       Customer         @relation(fields: [customer_id], references: [id])
+  technician     Technician       @relation(fields: [technician_id], references: [id])
+  bookingServices BookingService[]
+  order          Order?
+
+  @@map("bookings")
+}
+
+model BookingService {
+  id         String  @id @default(uuid())
+  booking_id String
+  service_id String
+  duration   Float
+  booking    Booking @relation(fields: [booking_id], references: [id])
+  service    Service @relation(fields: [service_id], references: [id])
+
+  @@map("booking_services")
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  booking_id       String      @unique
+  original_amount  Float
+  discount_amount  Float       @default(0)
+  final_amount     Float
+  status           String      @default("pending")
+  completed_at     DateTime?
+  booking          Booking     @relation(fields: [booking_id], references: [id])
+  orderItems       OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id           String @id @default(uuid())
+  order_id     String
+  service_name String
+  duration     Float
+  unit_price   Float
+  subtotal     Float
+  order        Order  @relation(fields: [order_id], references: [id])
+
+  @@map("order_items")
+}
+
+model StoreSettings {
+  id                    String  @id @default(uuid())
+  daily_workload_limit  Float
+  max_discount_percent  Float
+  max_discount_amount   Float
+  business_start        String
+  business_end          String
+
+  @@map("store_settings")
+}
