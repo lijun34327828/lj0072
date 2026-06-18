@@ -15,9 +15,9 @@
     "test:scenarios": "tsx server/src/utils/test-scenarios.ts",
     "lint": "eslint .",
     "check": "tsc --noEmit",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev"
+    "db:generate": "prisma generate --schema server/prisma/schema.prisma",
+    "db:push": "prisma db push --schema server/prisma/schema.prisma",
+    "db:migrate": "prisma migrate dev --schema server/prisma/schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
